@@ -48,12 +48,6 @@ FirebaseConfig config;
 // === Status Global ===
 String statusLampuFirebase = "OFF";
 
-// Fuzzy logic parameters
-const int KIPAS_MATI = 0;
-const int KIPAS_RENDAH = 80;
-const int KIPAS_SEDANG = 160;
-const int KIPAS_TINGGI = 200;
-
 // Serial2 RX/TX ke Arduino (ubah jika perlu)
 #define RXD2 18  // ESP32 RX2 (ke TX Arduino)
 #define TXD2 17  // ESP32 TX2 (ke RX Arduino)
@@ -163,19 +157,37 @@ void kontrolLampu(float suhu) {
   if (suhu > 28.20) Serial.println("OFF");
   else Serial.println("ON");
 }
-// ====== FUZZY PADA KIPAS DC =====
-int fuzzyFanControl(float humidity) {
-  if (humidity >= 30 && humidity < 60) return KIPAS_RENDAH;
-  else if (humidity >= 60 && humidity < 75) return KIPAS_SEDANG;
-  else if (humidity >= 75 && humidity <= 90) return KIPAS_TINGGI;
-  else return KIPAS_MATI;
+float fuzzyPWM(float H) {
+  float mu_kering = 0, mu_normal = 0, mu_basah = 0;
+
+  // Membership function triangular
+  if (H > 30 && H < 50) mu_kering = (H - 30) / 20.0;
+  if (H >= 50 && H <= 60) mu_normal = (H - 50) / 10.0;
+  else if (H > 60 && H <= 70) mu_normal = (70 - H) / 10.0;
+  if (H > 70 && H < 90) mu_basah = (H - 70) / 20.0;
+
+  // Nilai PWM Fuzzy Sugeno (orde-1)
+  // Rule 1: Kering (max)
+  float pwm1 = 255;       
+  // Rule 2: Normal (linear turun 255 -> 150)
+  float pwm2 = 255 - ((H - 50) / 20.0) * (255 - 150); 
+  // Rule 3: Basah (min)
+  float pwm3 = 150;
+
+  float numerator = mu_kering * pwm1 + mu_normal * pwm2 + mu_basah * pwm3;
+  float denominator = mu_kering + mu_normal + mu_basah;
+
+  if (H < 30 || H > 90) return 0;        // di luar range mati
+  if (denominator == 0) return 0;        // hindari div 0
+
+  return numerator / denominator;
 }
 void kontrolKipas(float kelembapan) {
-  pwmValue = fuzzyFanControl(kelembapan);
-  if (pwmValue == KIPAS_MATI) statusKipas = "OFF";
-  else if (pwmValue == KIPAS_RENDAH) statusKipas = "LOW";
-  else if (pwmValue == KIPAS_SEDANG) statusKipas = "MID";
-  else if (pwmValue == KIPAS_TINGGI) statusKipas = "HIGH";
+  pwmValue = fuzzyPWM(kelembapan);
+  if (pwmValue == 0) statusKipas = "OFF";
+else if (pwmValue <= 170) statusKipas = "LOW";     // 150-170
+else if (pwmValue <= 200) statusKipas = "MID";     // 171-200
+else statusKipas = "HIGH";                         // 201-255
 
   if (pwmValue > 0) {
     digitalWrite(motor1Pin1, LOW);
@@ -245,11 +257,16 @@ void loop() {
   Serial.print("🚰 Sisa Minum (mm): "); Serial.println(tinggiAirMM);
 
   if (Firebase.ready()) {
-    Firebase.setFloat(fbdo, "/Sensor/Suhu", suhu);
-    Firebase.setFloat(fbdo, "/Sensor/Kelembapan", kelembapan);
-    float pakanUntukFirebase = (jarakPakan > 0 && jarakPakan <= 10) ? jarakPakan : 0;
-    Firebase.setFloat(fbdo, "/Sensor/Sisa_Pakan", pakanUntukFirebase);
-    Firebase.setFloat(fbdo, "/Sensor/Sisa_Minuman", volumeMinum);
+  // Pembulatan ke 1 angka di belakang koma
+  float suhuFixed = round(suhu * 10) / 10.0;
+  float kelembapanFixed = round(kelembapan * 10) / 10.0;
+  float volumeMinumFixed = round(volumeMinum * 10) / 10.0;
+  float pakanUntukFirebase = jarakPakan;
+
+  Firebase.setFloat(fbdo, "/Sensor/Suhu", suhuFixed);
+  Firebase.setFloat(fbdo, "/Sensor/Kelembapan", kelembapanFixed);
+  Firebase.setFloat(fbdo, "/Sensor/Sisa_Pakan", pakanUntukFirebase);
+  Firebase.setFloat(fbdo, "/Sensor/Sisa_Minuman", volumeMinumFixed);
   }
 
 // TAMPILAN KE LCD 
