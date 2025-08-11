@@ -225,8 +225,8 @@ void loop() {
   bacaDataDariArduino();
 
 //KALIBRASI SENSOR 
-  float suhu = 0.969 * dht.readTemperature() + 0.2553;
-  float kelembapan = 0.9466 * dht.readHumidity() - 0.5885;
+  float suhu = 0.9723 * dht.readTemperature() + 0.1231;
+  float kelembapan = 1.1038 * dht.readHumidity() - 10.569;
   int tinggiAirMM = 0.893 * readWaterLevel() + 2.21;
   float volumeMinum = tinggiAirMM; 
 // volumeMinum sekarang menyimpan ketinggian air (mm)
