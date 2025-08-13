@@ -91,7 +91,7 @@ void loop() {
     delay(300); // Buzzer 0.3 detik
     digitalWrite(BUZZER_PIN, LOW);
     servo.write(90);
-    delay(2000);
+    delay(3000);
     servo.write(0);
     delay(500);
     servo.detach();
