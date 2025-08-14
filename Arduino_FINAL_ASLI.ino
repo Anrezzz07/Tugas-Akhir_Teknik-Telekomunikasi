@@ -72,7 +72,7 @@ void loop() {
   }
 
   // === KALIBRASI SENSOR ULTRASONIK ===
-  long jarak = round(1.0524 * readUltrasonicCM() - 0.3245);
+  long jarak = round(1.0463 * readUltrasonicCM() - 0.2749);
   String statusPakan = "";
 
   // === Penentuan Status Pakan ===
